@@ -1,11 +1,14 @@
-# svgify
+# svgify — Image to SVG converter
 
 [![CI](https://github.com/uselessworks-lab/svgify/actions/workflows/ci.yml/badge.svg)](https://github.com/uselessworks-lab/svgify/actions/workflows/ci.yml)
+[![Web demo](https://img.shields.io/badge/Web_demo-open-2f6f62)](https://uselessworks-lab.github.io/svgify/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Convert raster images into compact, limited-color SVG artwork for multi-material 3D-printing workflows. svgify reduces an image to at most 16 colors, merges small color regions, and traces aligned closed paths with shared boundaries.
+svgify is a TypeScript image-to-SVG converter for multi-material 3D-printing workflows. It turns raster images into compact SVG paths, reduces artwork to at most 16 colors, merges small color regions, and traces aligned closed contours with shared boundaries.
 
 The core is a dependency-free TypeScript library that runs in browsers and Node.js. This repository also contains a Sharp-based CLI and a local Web Worker demo.
+
+**[Try the image-to-SVG converter in your browser](https://uselessworks-lab.github.io/svgify/)** — processing stays in the browser.
 
 > svgify produces planar vector artwork, not STL, 3MF, G-code, or a printability guarantee. Add thickness and validate line width, gaps, connectivity, and slicer compatibility downstream.
 
@@ -142,12 +145,14 @@ Existing files are not overwritten unless `--force` is supplied. `--output -` wr
 
 ## Web demo
 
+The latest `main` build is available at **[uselessworks-lab.github.io/svgify](https://uselessworks-lab.github.io/svgify/)**.
+
 ```sh
 npm ci
 npm run dev
 ```
 
-Open [http://127.0.0.1:4020](http://127.0.0.1:4020). The English-only demo processes images locally in the browser and exposes Original, SVG, and Split views with synchronized zoom and pan. Conversion options update the preview automatically after a short debounce.
+For local development, open [http://127.0.0.1:4020](http://127.0.0.1:4020). The English-only demo processes images locally in the browser and exposes Original, SVG, and Split views with synchronized zoom and pan. Conversion options update the preview automatically after a short debounce.
 
 ## Repository layout
 

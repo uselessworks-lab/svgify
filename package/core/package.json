@@ -1,7 +1,7 @@
 {
   "name": "@uselessworks/svgify",
   "version": "0.1.0",
-  "description": "Deterministic, print-oriented image quantization and SVG vectorization in TypeScript.",
+  "description": "TypeScript image-to-SVG converter with print-oriented color quantization and vectorization.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -37,8 +37,9 @@
     "node": ">=22.13.0"
   },
   "keywords": [
+    "image-to-svg",
     "svg",
-    "quantization",
+    "color-quantization",
     "3d-printing",
     "vectorization",
     "oklab"

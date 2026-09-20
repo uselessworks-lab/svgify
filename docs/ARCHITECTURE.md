@@ -2,7 +2,7 @@
 
 ## Repository contract
 
-Reference: the local useless works handbook, `docs/technical/project-architecture.md`, revision `765fbe443b5bba953bef720a74be1cd7b81bc11c`, reviewed on 2026-09-19. Adopted layout: `package/core` + `app/*`, apps depend on core, never the reverse. No handbook submodule, sibling file dependency, public website deployment or npm publication was created. A future formal organization adoption can pin the shared handbook. The web surface here is an English-only test editor, not a public landing shell. UI copy, accessibility labels and document metadata are authored in English.
+Reference: the local useless works handbook, `docs/technical/project-architecture.md`, revision `765fbe443b5bba953bef720a74be1cd7b81bc11c`, reviewed on 2026-09-19. Adopted layout: `package/core` + `app/*`, apps depend on core, never the reverse. No handbook submodule, sibling file dependency or npm publication was created. A future formal organization adoption can pin the shared handbook. The web surface is an English-only test editor published from `main` to GitHub Pages. UI copy, accessibility labels and document metadata are authored in English.
 
 ## Source of truth
 
@@ -25,6 +25,7 @@ Reference: the local useless works handbook, `docs/technical/project-architectur
 | Editor semantic tokens and responsive styles | `app/web/src/style.css` |
 | Sample image source | Canvas drawing in `main.ts`; project test art, no external brand asset |
 | Package/build contracts | Root/workspace `package.json`, `tsconfig*.json` |
+| CI verification and GitHub Pages deployment | `.github/workflows/ci.yml` |
 | Invariants, CLI parity, architecture checks | `tests/` |
 | Benchmarks | `tools/benchmark.mjs` |
 
@@ -69,5 +70,7 @@ Straight/curve fitting removes pixel stair steps while preserving significant co
 Core compiles with `lib: ES2022`, `types: []`, so accidental DOM/Node globals fail typecheck. It has no runtime dependencies. Browser and CLI import only `@uselessworks/svgify`. CLI owns sharp and native image decoding. Browser owns canvas decoding and a Worker, transfers pixel buffers, terminates obsolete/canceled jobs, and ignores stale responses. File decode requests have a separate sequence token to prevent stale uploads replacing newer sources.
 
 The core package includes ESM, declarations, README and license. CLI is separately publishable with a pinned matching core dependency and a `svgify` binary. Demo is private and absent from both tarballs. `prepack` builds each package; core must exist before building the CLI. `npm run build` enforces order. Public npm naming/ownership and publication are not verified by local packaging.
+
+The production web build uses relative asset URLs so the same `app/web/dist` artifact works under the repository-scoped `/svgify/` GitHub Pages path. Pull requests run the complete verification build without deployment. A successful `main` push uploads the already-verified web artifact and deploys it through the `github-pages` environment.
 
 The repository root also exposes the core ESM and declarations through `main`, `types`, and `exports`. Its `prepare` script builds only the core, allowing `git+https://github.com/uselessworks-lab/svgify.git` to be installed directly without bundling the CLI or demo. The root remains private to prevent accidental npm publication; the independently publishable package manifest remains in `package/core`. The root package name matches the public import name so direct Git installs produce `@uselessworks/svgify` without an alias.
