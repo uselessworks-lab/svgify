@@ -1,0 +1,52 @@
+{
+  "name": "@uselessworks/svgify",
+  "version": "0.1.0",
+  "description": "Deterministic, print-oriented image quantization and SVG vectorization in TypeScript.",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uselessworks-lab/svgify.git"
+  },
+  "homepage": "https://github.com/uselessworks-lab/svgify#readme",
+  "bugs": "https://github.com/uselessworks-lab/svgify/issues",
+  "main": "./package/core/dist/index.js",
+  "types": "./package/core/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./package/core/dist/index.d.ts",
+      "import": "./package/core/dist/index.js"
+    }
+  },
+  "files": [
+    "package/core/dist",
+    "package/core/README.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "workspaces": [
+    "package/*",
+    "app/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build:core": "npm run build -w @uselessworks/svgify",
+    "build": "npm run build:core && npm run build -w @uselessworks/svgify-cli && npm run build -w @svgify/demo",
+    "dev": "npm run build:core && npm run dev -w @svgify/demo",
+    "typecheck": "npm run build:core && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:core && npm run build -w @uselessworks/svgify-cli && node --test tests/*.test.mjs",
+    "bench": "npm run build:core && node tools/benchmark.mjs",
+    "cli": "node app/cli/dist/main.js",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "prepare": "npm run build:core"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "typescript": "5.9.3",
+    "vite": "6.4.3"
+  }
+}

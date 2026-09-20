@@ -1,0 +1,46 @@
+{
+  "name": "@uselessworks/svgify",
+  "version": "0.1.0",
+  "description": "Deterministic, print-oriented image quantization and SVG vectorization in TypeScript.",
+  "type": "module",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uselessworks-lab/svgify.git",
+    "directory": "package/core"
+  },
+  "homepage": "https://github.com/uselessworks-lab/svgify/tree/main/package/core#readme",
+  "bugs": "https://github.com/uselessworks-lab/svgify/issues",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": [
+    "svg",
+    "quantization",
+    "3d-printing",
+    "vectorization",
+    "oklab"
+  ]
+}

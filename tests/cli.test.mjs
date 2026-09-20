@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import sharp from 'sharp';
+import { convertImage } from '@uselessworks/svgify';
+const cli=resolve('app/cli/dist/main.js');
+const run=args=>spawnSync(process.execPath,[cli,...args],{encoding:'utf8'});
+test('CLI PNG decode, core parity, reports, layer exports, stdout and safe overwrite',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'svgify-'));
+  try {
+    const data=Buffer.from([255,0,0,255,0,0,255,255,0,0,0,0,255,0,0,255]);
+    const file=join(dir,'input.png'),svg=join(dir,'out.svg'),report=join(dir,'report.json');
+    await sharp(data,{raw:{width:2,height:2,channels:4}}).png().toFile(file);
+    const args=[file,'-o',svg,'--colors','2','--min-region-pixels','0','--width-mm','24'];
+    const command=run([...args,'--layers',join(dir,'layers'),'--report',report]);
+    assert.equal(command.status,0,command.stderr);
+    assert.equal(await readFile(svg,'utf8'),convertImage({data,width:2,height:2},{colors:2,minRegionPixels:0,widthMm:24}).svg);
+    const json=JSON.parse(await readFile(report,'utf8')); assert.equal(json.stats.colors,2); assert.equal(json.widthMm,24);
+    assert.equal((await readdir(join(dir,'layers'))).length,2);
+    assert.equal(run(args).status,1); assert.equal(run([...args,'--force']).status,0);
+    const stdout=run([file,'-o','-']); assert.equal(stdout.status,0); assert.match(stdout.stdout,/^<svg/); assert.match(stdout.stderr,/colors/);
+    assert.equal(run([file,'--colors','17','-o','-']).status,1);
+    assert.equal(run([file,'--curve-tolerance','5','-o','-']).status,1);
+    assert.equal(run([file,'--curve-tolerance','0','-o','-']).status,0);
+    assert.equal(run([file,'--unknown']).status,1); assert.equal(run([]).status,1);
+    assert.equal(run([file,'-o',file,'--force']).status,1);
+    const fake=join(dir,'bad.png'); await writeFile(fake,'not an image'); assert.equal(run([fake]).status,1);
+    const vector=join(dir,'in.svg'); await writeFile(vector,'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'); assert.equal(run([vector,'-o','-']).status,1);
+    const backgroundData=Buffer.alloc(8*8*4,255);
+    backgroundData.set([200,20,30,255],(3*8+3)*4);
+    const backgroundFile=join(dir,'background.png');
+    await sharp(backgroundData,{raw:{width:8,height:8,channels:4}}).png().toFile(backgroundFile);
+    const removed=run([backgroundFile,'--remove-background','--min-region-pixels','0','-o','-']);
+    assert.equal(removed.status,0,removed.stderr);
+    assert.equal(removed.stdout.trim(),convertImage({data:backgroundData,width:8,height:8},{removeBackground:true,minRegionPixels:0}).svg);
+    assert.equal(run(['--help']).status,0);
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});
