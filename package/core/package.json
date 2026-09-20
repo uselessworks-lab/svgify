@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Deterministic, print-oriented image quantization and SVG vectorization in TypeScript.",
   "type": "module",
-  "license": "MPL-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/uselessworks-lab/svgify.git",

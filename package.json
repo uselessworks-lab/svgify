@@ -4,7 +4,7 @@
   "description": "Deterministic, print-oriented image quantization and SVG vectorization in TypeScript.",
   "private": true,
   "type": "module",
-  "license": "MPL-2.0",
+  "license": "MIT",
   "sideEffects": false,
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 # svgify
 
 [![CI](https://github.com/uselessworks-lab/svgify/actions/workflows/ci.yml/badge.svg)](https://github.com/uselessworks-lab/svgify/actions/workflows/ci.yml)
-[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Convert raster images into compact, limited-color SVG artwork for multi-material 3D-printing workflows. svgify reduces an image to at most 16 colors, merges small color regions, and traces aligned closed paths with shared boundaries.
 
@@ -166,7 +166,7 @@ Algorithms, defaults, geometry, physical sizing, and SVG serialization live in `
 
 ```sh
 npm ci
-npm run verify   # typecheck, 23 tests, core/CLI/demo production builds
+npm run verify   # typecheck, 24 tests, core/CLI/demo production builds
 npm run bench
 ```
 
@@ -176,8 +176,8 @@ Design details are recorded in [Architecture](docs/ARCHITECTURE.md) and evidence
 
 ## License
 
-svgify is licensed under the [Mozilla Public License 2.0](LICENSE).
+svgify is licensed under the [MIT License](LICENSE).
 
-You may use it commercially, include it in a proprietary larger work, and keep modifications private while they remain inside your organization. If you distribute svgify or modified files outside your organization, the MPL-covered source files and your modifications to those files must remain available under MPL-2.0, and existing license notices must be preserved. Separate files in a larger application may remain proprietary.
+You may use, copy, modify, distribute, sublicense, and sell the software, including as part of private or proprietary products. Copies or substantial portions must retain the copyright and license notice. MIT does not require modified source code to be published.
 
-This summary is informational; the license text controls. See the [official MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/) for practical guidance.
+This summary is informational; the license text controls. See the [OSI license page](https://opensource.org/license/mit) for the standard MIT terms.

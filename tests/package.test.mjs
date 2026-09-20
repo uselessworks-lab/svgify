@@ -7,8 +7,8 @@ test('repository root is installable as the core package from Git', async () => 
   const core = JSON.parse(await readFile('package/core/package.json', 'utf8'));
   assert.equal(root.name, '@uselessworks/svgify');
   assert.equal(root.private, true, 'root must remain protected from accidental npm publication');
-  assert.equal(root.license, 'MPL-2.0');
-  assert.equal(core.license, 'MPL-2.0');
+  assert.equal(root.license, 'MIT');
+  assert.equal(core.license, 'MIT');
   assert.equal(root.repository.url, 'git+https://github.com/uselessworks-lab/svgify.git');
   assert.equal(root.exports['.'].import, './package/core/dist/index.js');
   assert.equal(root.exports['.'].types, './package/core/dist/index.d.ts');
