@@ -1,6 +1,6 @@
 # @uselessworks/svgify-cli
 
-Node.js CLI for `@uselessworks/svgify`. Requires Node.js 22.13+. Version 0.1.0 is prepared locally and has not been published.
+Node.js CLI for `@uselessworks/svgify`. Requires Node.js 22.13+. This workspace is private and uses the repository root library during development; it has not been published.
 
 ```sh
 svgify input.png --colors 8 --curve-tolerance 1 --width-mm 100 -o output.svg

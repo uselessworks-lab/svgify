@@ -12,22 +12,21 @@
   },
   "homepage": "https://github.com/uselessworks-lab/svgify#readme",
   "bugs": "https://github.com/uselessworks-lab/svgify/issues",
-  "main": "./package/core/dist/index.js",
-  "types": "./package/core/dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./package/core/dist/index.d.ts",
-      "import": "./package/core/dist/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [
-    "package/core/dist",
-    "package/core/README.md",
+    "dist",
+    "package",
     "README.md",
     "LICENSE"
   ],
   "workspaces": [
-    "package/*",
     "app/*"
   ],
   "engines": {
@@ -42,7 +41,7 @@
     "oklab"
   ],
   "scripts": {
-    "build:core": "npm run build -w @uselessworks/svgify",
+    "build:core": "tsc -p package/tsconfig.json",
     "build": "npm run build:core && npm run build -w @uselessworks/svgify-cli && npm run build -w @svgify/demo",
     "dev": "npm run build:core && npm run dev -w @svgify/demo",
     "typecheck": "npm run build:core && npm run typecheck --workspaces --if-present",

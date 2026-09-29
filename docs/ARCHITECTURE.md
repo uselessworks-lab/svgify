@@ -2,16 +2,16 @@
 
 ## Repository contract
 
-Reference: the local useless works handbook, `docs/technical/project-architecture.md`, revision `765fbe443b5bba953bef720a74be1cd7b81bc11c`, reviewed on 2026-09-19. Adopted layout: `package/core` + `app/*`, apps depend on core, never the reverse. No handbook submodule, sibling file dependency or npm publication was created. A future formal organization adoption can pin the shared handbook. The web surface is an English-only test editor published from `main` to GitHub Pages. UI copy, accessibility labels and document metadata are authored in English.
+Reference: the local useless works handbook, `docs/technical/project-architecture.md`, revision `765fbe443b5bba953bef720a74be1cd7b81bc11c`, reviewed on 2026-09-19. Adopted layout: `package` + `app/*`, apps depend on core, never the reverse. No handbook submodule, sibling file dependency or npm publication was created. A future formal organization adoption can pin the shared handbook. The web surface is an English-only test editor published from `main` to GitHub Pages. UI copy, accessibility labels and document metadata are authored in English.
 
 ## Source of truth
 
 | Responsibility | Location |
 |---|---|
-| Public contracts, options, limits, defaults | `package/core/src/types.ts`, `options.ts` |
-| Conversion composition, validation, diagnostics | `package/core/src/index.ts` |
-| Optional border-connected background removal | `package/core/src/background.ts` |
-| Alpha-aware area resampling | `package/core/src/raster.ts` |
+| Public contracts, options, limits, defaults | `package/types.ts`, `options.ts` |
+| Conversion composition, validation, diagnostics | `package/index.ts` |
+| Optional border-connected background removal | `package/background.ts` |
+| Alpha-aware area resampling | `package/raster.ts` |
 | Oklab transform and quantization | `color.ts`, `quantize.ts` |
 | Connected-component cleanup | `regions.ts` |
 | Raster geometry, orientation, closure, simple rings | `trace.ts` |
@@ -69,8 +69,8 @@ Straight/curve fitting removes pixel stair steps while preserving significant co
 
 Core compiles with `lib: ES2022`, `types: []`, so accidental DOM/Node globals fail typecheck. It has no runtime dependencies. Browser and CLI import only `@uselessworks/svgify`. CLI owns sharp and native image decoding. Browser owns canvas decoding and a Worker, transfers pixel buffers, terminates obsolete/canceled jobs, and ignores stale responses. File decode requests have a separate sequence token to prevent stale uploads replacing newer sources.
 
-The core package includes ESM, declarations, README and license. CLI is separately publishable with a pinned matching core dependency and a `svgify` binary. Demo is private and absent from both tarballs. `prepack` builds each package; core must exist before building the CLI. `npm run build` enforces order. Public npm naming/ownership and publication are not verified by local packaging.
+The root library package includes ESM, declarations, README and license. CLI has its own private manifest and a `svgify` binary for local use. Its dependency points to the repository root during development; publishing the CLI would require switching that dependency to a released library version. Demo is private and absent from the library archive. The root `prepare` script builds core before Git installation or packing; `npm run build` builds core before the apps. Public npm naming/ownership and publication are not verified by local packaging.
 
 The production web build uses relative asset URLs so the same `app/web/dist` artifact works under the repository-scoped `/svgify/` GitHub Pages path. Pull requests run the complete verification build without deployment. A successful `main` push uploads the already-verified web artifact and deploys it through the `github-pages` environment.
 
-The repository root also exposes the core ESM and declarations through `main`, `types`, and `exports`. Its `prepare` script builds only the core, allowing `git+https://github.com/uselessworks-lab/svgify.git` to be installed directly without bundling the CLI or demo. The root remains private to prevent accidental npm publication; the independently publishable package manifest remains in `package/core`. The root package name matches the public import name so direct Git installs produce `@uselessworks/svgify` without an alias.
+The repository root exposes core ESM and declarations from `dist/` through `main`, `types`, and `exports`. Its `prepare` script builds only the core, allowing `git+https://github.com/uselessworks-lab/svgify.git` to be installed directly without bundling the CLI or demo. The root remains private to prevent accidental npm publication. The root package name matches the public import name so direct Git installs produce `@uselessworks/svgify` without an alias.

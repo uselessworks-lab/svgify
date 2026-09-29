@@ -125,7 +125,7 @@ const result = convertImage({ width: info.width, height: info.height, data });
 | `alphaThreshold` | `128` | Pixels below this alpha become empty space |
 | `matte` | `#ffffff` | Matte for retained translucent pixels |
 
-See [the core package documentation](package/core/README.md) for the complete result contract, geometry semantics, custom quantizers, and limitations.
+See [the core package documentation](package/README.md) for the complete result contract, geometry semantics, custom quantizers, and limitations.
 
 ## CLI
 
@@ -157,7 +157,8 @@ For local development, open [http://127.0.0.1:4020](http://127.0.0.1:4020). The 
 ## Repository layout
 
 ```text
-package/core/  @uselessworks/svgify library source and publishable package
+package/  @uselessworks/svgify library TypeScript source
+dist/     generated JavaScript and declarations
 app/cli/       @uselessworks/svgify-cli, Node.js + Sharp
 app/web/       private Vite/Web Worker demo
 tests/         core invariants and CLI integration tests
@@ -165,7 +166,7 @@ tools/         reproducible performance benchmark
 docs/          architecture and validation records
 ```
 
-Algorithms, defaults, geometry, physical sizing, and SVG serialization live in `package/core`. Apps consume the public core API and never the reverse. The root manifest re-exports the built core so this Git repository can be installed directly as `@uselessworks/svgify`.
+Algorithms, defaults, geometry, physical sizing, and SVG serialization live in `package`. Apps consume the public core API and never the reverse. The root manifest exposes the built core from `dist/` for Git installation and future npm publication.
 
 ## Development
 
