@@ -1,5 +1,5 @@
 import { DEFAULT_OPTIONS } from '@uselessworks/svgify';
-import type { ConversionResult, RasterImage } from '@uselessworks/svgify';
+import type { ConversionResult, RasterImage, ConvertOptions } from '@uselessworks/svgify';
 import type { Request, Response } from './protocol';
 import './style.css';
 import { createPreview, previewMarkup } from './preview.js';
@@ -14,15 +14,20 @@ root.innerHTML = `
       <label class="upload" id="drop"><input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"><span class="upload-icon">＋</span><strong>Choose an image</strong><span>or drop it here</span><small>PNG · JPG · WebP / up to 40MP, 30MB</small></label>
       <p id="filename" class="filename">Sample: Landscape study</p>
       <form id="settings">
-        <div class="background-option"><label class="background-toggle" for="remove-background">Remove background<input id="remove-background" type="checkbox" role="switch" aria-describedby="background-help"></label><p id="background-help" class="hint">Removes a solid background connected to the image border. Does not isolate subjects in complex photos.</p></div>
+        <div class="background-option"><label class="background-toggle" for="remove-background">Remove background<input id="remove-background" type="checkbox" role="switch" aria-describedby="background-help"></label><p id="background-help" class="hint">Matches colors before reducing the palette. Similar subject colors may need a lower background tolerance.</p></div>
         <div class="section-label"><span>02 / MATERIALS</span><output id="color-value" for="colors">8 COLORS</output></div>
         <label class="field">Maximum colors<input id="colors" name="colors" type="range" min="1" max="16" value="${DEFAULT_OPTIONS.colors}"></label><div class="range-labels"><span>1</span><span>16</span></div>
         <label class="field">Filament palette <span class="optional">optional</span><textarea id="palette-input" rows="2" placeholder="#183f3b, #f4e7c6, #de784c" aria-describedby="palette-help"></textarea></label><p id="palette-help" class="hint">Leave empty to extract colors. Use comma-separated #rrggbb values.</p>
         <div class="section-label divided"><span>03 / GEOMETRY</span><span>mm</span></div>
         <div class="field-grid"><label class="field">Width (mm)<input id="width" type="number" min="0.1" max="10000" step="0.1" value="${DEFAULT_OPTIONS.widthMm}" required></label><label class="field">Min. area (mm²)<input id="area" type="number" min="0" max="100000000" step="0.01" value="0.1" required></label></div>
         <label class="field">Merge small regions <span class="optional">pixel area</span><input id="regions" type="number" min="0" max="4194304" step="1" value="${DEFAULT_OPTIONS.minRegionPixels}" required></label>
-        <label class="field" for="curve-tolerance">Curve simplification <output id="curve-value" for="curve-tolerance">${DEFAULT_OPTIONS.curveTolerance} px</output><input id="curve-tolerance" type="range" min="0" max="4" step="0.1" value="${DEFAULT_OPTIONS.curveTolerance}"></label><p class="hint">0 preserves pixel edges. Higher values simplify small bends into lines and curves.</p>
+        <label class="field" for="curve-tolerance">Curve tolerance <output id="curve-value" for="curve-tolerance">${DEFAULT_OPTIONS.curveTolerance} px</output><input id="curve-tolerance" type="range" min="0" max="4" step="0.1" value="${DEFAULT_OPTIONS.curveTolerance}"></label><p class="hint">0 preserves pixel edges. Lower values retain more detail; higher values allow simpler paths.</p>
         <label class="field">Processing resolution<select id="resolution"><option value="384">384 px · Fast</option><option value="768" selected>768 px · Balanced</option><option value="1024">1024 px · Detailed</option><option value="1536">1536 px · High resolution</option></select></label>
+        <details class="advanced-options"><summary>Advanced options</summary>
+          <label class="field" for="curve-quality">Curve quality<select id="curve-quality" aria-describedby="curve-quality-help"><option value="balanced">Balanced · Fast</option><option value="high">High · Smooth Bézier fitting</option></select></label><p id="curve-quality-help" class="hint">High fits curves to the original shared boundaries for smoother zoomed edges. Takes more time; small or conflicting boundaries may retain pixel detail. Requires curve tolerance above 0.</p>
+          <label class="field" for="curve-smoothing">Boundary smoothing <output id="smoothing-value" for="curve-smoothing">${DEFAULT_OPTIONS.curveSmoothing} px</output><input id="curve-smoothing" type="range" min="0" max="3" step="0.1" value="${DEFAULT_OPTIONS.curveSmoothing}" aria-describedby="curve-smoothing-help"></label><p id="curve-smoothing-help" class="hint">High quality only. Softens small edge bumps before fitting. Try 1–2 px; higher values soften fine detail. 0 disables smoothing. Shared boundaries, major corners and junctions are preserved.</p>
+          <label class="field" for="background-tolerance">Background tolerance<input id="background-tolerance" type="number" min="0" max="0.1" step="0.001" value="${DEFAULT_OPTIONS.backgroundTolerance}" aria-describedby="background-tolerance-help" required></label><p id="background-tolerance-help" class="hint">Lower values protect pale artwork. Higher values remove more background color variation. Uses original colors, before palette reduction.</p>
+        </details>
         <button id="convert" class="primary" type="submit">Convert <span>↗</span></button>
         <button id="cancel" type="button" class="secondary" hidden>Cancel conversion</button>
       </form>
@@ -83,7 +88,7 @@ function convert() {
   if (!source || !controls.reportValidity()) return;
   cancel(); clearResult(); status.classList.remove('error');
   const paletteText = $<HTMLTextAreaElement>('palette-input').value.trim();
-  const options = { removeBackground: $<HTMLInputElement>('remove-background').checked, colors: +$<HTMLInputElement>('colors').value, curveTolerance: +$<HTMLInputElement>('curve-tolerance').value, widthMm: +$<HTMLInputElement>('width').value, minRegionPixels: +$<HTMLInputElement>('regions').value, minRegionAreaMm2: +$<HTMLInputElement>('area').value, maxDimension: +$<HTMLSelectElement>('resolution').value, ...(paletteText ? { palette: paletteText.split(',').map(c=>c.trim()) } : {}) };
+  const options: ConvertOptions = { curveSmoothing: +$<HTMLInputElement>('curve-smoothing').value, backgroundTolerance: +$<HTMLInputElement>('background-tolerance').value, curveQuality: $<HTMLSelectElement>('curve-quality').value as ConvertOptions['curveQuality'], removeBackground: $<HTMLInputElement>('remove-background').checked, colors: +$<HTMLInputElement>('colors').value, curveTolerance: +$<HTMLInputElement>('curve-tolerance').value, widthMm: +$<HTMLInputElement>('width').value, minRegionPixels: +$<HTMLInputElement>('regions').value, minRegionAreaMm2: +$<HTMLInputElement>('area').value, maxDimension: +$<HTMLSelectElement>('resolution').value, ...(paletteText ? { palette: paletteText.split(',').map(c=>c.trim()) } : {}) };
   const current = ++job;
   worker = new Worker(new URL('./convert.worker.ts', import.meta.url), { type: 'module' });
   worker.onmessage = ({ data }: MessageEvent<Response>) => {
@@ -119,6 +124,7 @@ function convert() {
 }
 function scheduleConversion() {
   $('color-value').textContent = `${$<HTMLInputElement>('colors').value} COLORS`;
+  $('smoothing-value').textContent = `${$<HTMLInputElement>('curve-smoothing').value} px`;
   $('curve-value').textContent = `${$<HTMLInputElement>('curve-tolerance').value} px`;
   settingsDirty = true;
   if (conversionTimer !== undefined) window.clearTimeout(conversionTimer);

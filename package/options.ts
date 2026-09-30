@@ -1,6 +1,6 @@
 import type { ConvertOptions, RasterImage, ResolvedOptions, RGB } from './types.js';
 export const DEFAULT_OPTIONS: Readonly<ResolvedOptions> = Object.freeze({
-  removeBackground: false, colors: 8, curveTolerance: 1, maxDimension: 768, iterations: 10, minRegionPixels: 8,
+  removeBackground: false, backgroundTolerance: 0.015, curveQuality: 'balanced', curveSmoothing: 1, colors: 8, curveTolerance: 1, maxDimension: 768, iterations: 10, minRegionPixels: 8,
   minRegionAreaMm2: 0, widthMm: 100, alphaThreshold: 128, matte: '#ffffff',
 });
 export function parseHex(value: string): RGB {
@@ -19,7 +19,10 @@ export function resolveOptions(input: ConvertOptions = {}): ResolvedOptions {
   if (!Number.isFinite(o.widthMm) || o.widthMm < 0.1 || o.widthMm > 10000) throw new RangeError('widthMm must be between 0.1 and 10000.');
   if (!Number.isFinite(o.minRegionAreaMm2) || o.minRegionAreaMm2 < 0 || o.minRegionAreaMm2 > 100_000_000) throw new RangeError('minRegionAreaMm2 must be between 0 and 100000000.');
   if (!Number.isFinite(o.curveTolerance) || o.curveTolerance < 0 || o.curveTolerance > 4) throw new RangeError('curveTolerance must be between 0 and 4.');
+  if (!Number.isFinite(o.curveSmoothing) || o.curveSmoothing < 0 || o.curveSmoothing > 3) throw new RangeError('curveSmoothing must be between 0 and 3.');
   if (typeof o.removeBackground !== 'boolean') throw new TypeError('removeBackground must be a boolean.');
+  if (!Number.isFinite(o.backgroundTolerance) || o.backgroundTolerance < 0 || o.backgroundTolerance > 0.1) throw new RangeError('backgroundTolerance must be between 0 and 0.1.');
+  if (o.curveQuality !== 'balanced' && o.curveQuality !== 'high') throw new TypeError('curveQuality must be balanced or high.');
   parseHex(o.matte);
   if (o.palette !== undefined) {
     if (!Array.isArray(o.palette) || o.palette.length < 1 || o.palette.length > o.colors) throw new RangeError('palette must contain 1 to colors entries (maximum 16).');

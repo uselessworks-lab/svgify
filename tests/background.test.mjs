@@ -67,3 +67,31 @@ test('uniform, one-dimensional and empty inputs produce valid empty geometry', (
   assert.equal(resolveOptions().removeBackground,false);
   assert.throws(()=>resolveOptions({removeBackground:'true'}),/boolean/);
 });
+
+
+test('pale foreground survives original-color removal even with a single shared palette color', () => {
+  const cream = [251,244,232,255];
+  const input = fixture(48,48,(x,y) => x>=10 && x<38 && y>=8 && y<42 ? cream : white);
+  for (const colors of [1,2,8,16]) {
+    const result=convertImage(input,{...options,colors,removeBackground:true,palette:['#ffffff']});
+    assert.equal(result.stats.opaquePixels,28*34);
+    assert.equal(result.labels[24*48+24],0);
+    assert.equal(result.labels[0],-1);
+  }
+  const loose=convertImage(input,{...options,removeBackground:true,backgroundTolerance:0.05});
+  assert.equal(loose.stats.opaquePixels,0,'loose original-color matching can still erase similar artwork');
+  assert.equal(resolveOptions().backgroundTolerance,0.015);
+  for(const backgroundTolerance of [-0.001,0.101,NaN,Infinity]) assert.throws(()=>resolveOptions({backgroundTolerance}));
+});
+
+test('background tolerance is independent of color budget and quantizers receive the retained alpha mask', () => {
+  const input=fixture(32,32,(x,y)=>x>=8&&x<24&&y>=8&&y<24?[253,251,247,255]:white);
+  const result=convertImage(input,{...options,removeBackground:true,backgroundTolerance:0,colors:1},{
+    quantize(image) {
+      assert.equal(image.data[(16*32+16)*4+3],255);
+      assert.equal(image.data[3],0);
+      return {width:32,height:32,palette:[[255,255,255]],quantizationError:0,labels:Int8Array.from({length:1024},(_,p)=>image.data[p*4+3]?0:-1)};
+    },
+  });
+  assert.equal(result.stats.opaquePixels,256);
+});

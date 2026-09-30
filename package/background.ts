@@ -2,7 +2,7 @@ import { distance, toLab } from './color.js';
 import type { RasterImage } from './types.js';
 
 /** Remove only a dominant, near-solid color connected to the image border. */
-export function removeBorderBackground(image: RasterImage, alphaThreshold: number): { image: RasterImage; removedPixels: number } {
+export function removeBorderBackground(image: RasterImage, alphaThreshold: number, tolerance: number): { image: RasterImage; removedPixels: number } {
   const { width: w, height: h, data } = image;
   const border: number[] = [];
   for (let x = 0; x < w; x++) { border.push(x); if (h > 1) border.push((h - 1) * w + x); }
@@ -20,7 +20,7 @@ export function removeBorderBackground(image: RasterImage, alphaThreshold: numbe
   const color = toLab([Math.round(dominant.r / dominant.count), Math.round(dominant.g / dominant.count), Math.round(dominant.b / dominant.count)]);
   const matches = (p: number): boolean => {
     const i = p * 4;
-    return data[i + 3] >= alphaThreshold && distance(color, toLab([data[i], data[i + 1], data[i + 2]])) <= 0.05 ** 2;
+    return data[i + 3] >= alphaThreshold && distance(color, toLab([data[i], data[i + 1], data[i + 2]])) <= tolerance ** 2;
   };
   // Transparent perimeter counts against support, protecting already cut-out images.
   if (border.filter(matches).length <= border.length / 2) return { image, removedPixels: 0 };

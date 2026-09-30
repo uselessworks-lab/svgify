@@ -2,7 +2,7 @@ import type { ColorLayer, Point, QuantizedImage, VectorContour, PathSegment } fr
 import { signedArea } from './trace.js';
 
 type Edge = { a: number; b: number };
-type Chain = { points: Point[]; closed: boolean; exact: VectorContour; fitted: VectorContour; active: boolean };
+type Chain = { points: Point[]; closed: boolean; exact: VectorContour; fitted: VectorContour; active: boolean; attempts: number };
 type Ref = { chain: number; reverse: boolean };
 type Line = { a: Point; b: Point; chain: number; index: number; count: number };
 const same = (a: Point, b: Point) => a[0] === b[0] && a[1] === b[1];
@@ -77,10 +77,157 @@ function fit(points: Point[], closed: boolean, tolerance: number): VectorContour
   if (closed) line(start);
   return {start,segments};
 }
+const unit = (v: Point): Point => { const size = Math.hypot(...v); return size ? [v[0]/size,v[1]/size] : [1,0]; };
+type Cubic = [Point,Point,Point,Point];
+const xy = (coordinate: (axis:number)=>number): Point => [coordinate(0),coordinate(1)];
+function cubicAt(c: Cubic, t: number): Point {
+  const u=1-t;
+  return xy(axis=>u**3*c[0][axis]+3*u*u*t*c[1][axis]+3*u*t*t*c[2][axis]+t**3*c[3][axis]);
+}
+/** Least-squares cubic fitting with shared split tangents and bounded refinement. */
+function fitHigh(points: Point[], closed: boolean, tolerance: number, smoothing = 1): VectorContour {
+  const original=points;
+  const total=points.reduce((sum,p,i)=>sum+(i?length(points[i-1],p):0),0);
+  if(points.length<5 || total<8 || total>250_000) return exactContour(points);
+  let split=1;
+  if(closed) for(let i=2;i<points.length-1;i++) if(length(points[0],points[i])>length(points[0],points[split])) split=i;
+  const guide=closed
+    ? [...simplify(points.slice(0,split+1),Math.max(0.75,tolerance)).slice(0,-1),...simplify(points.slice(split),Math.max(0.75,tolerance)).slice(0,-1)]
+    : simplify(points,Math.max(0.75,tolerance));
+  const pointIndices=new Map(points.slice(0,closed?-1:points.length).map((p,i)=>[p,i]));
+  let corners=new Set<number>();
+  for(let i=closed?0:1;i<(closed?guide.length:guide.length-1);i++) {
+    const a=sub(guide[i],guide[(i+guide.length-1)%guide.length]), b=sub(guide[(i+1)%guide.length],guide[i]);
+    const la=Math.hypot(...a),lb=Math.hypot(...b);
+    if(la>=2 && lb>=2 && (a[0]*b[0]+a[1]*b[1])/(la*lb)<=0.5) {
+      const index=pointIndices.get(guide[i])!, n=points.length-1;
+      const probe=Math.max(12,6*smoothing);
+      let before=index,after=index,back=0,forward=0;
+      while(back<probe) {const next=before>0?before-1:closed?n-1:before;if(next===before) break;back+=length(points[before],points[next]);before=next;}
+      while(forward<probe) {const next=after<n?after+1:closed?1:after;if(next===after) break;forward+=length(points[after],points[next]);after=next;}
+      const incoming=unit(sub(points[index],points[before])),outgoing=unit(sub(points[after],points[index]));
+      // A coarse-guide kink must also be visible beyond the raster staircase scale.
+      if(incoming[0]*outgoing[0]+incoming[1]*outgoing[1]<=0.65) corners.add(index);
+    }
+  }
+  if(smoothing) {
+    const sampled:Point[]=[points[0]],offsets=[0];
+    for(let i=1;i<points.length;i++) {
+      const count=Math.max(1,Math.ceil(length(points[i-1],points[i])));
+      for(let j=1;j<=count;j++) sampled.push(mix(points[i-1],points[i],j/count));
+      offsets.push(sampled.length-1);
+    }
+    corners=new Set([...corners].map(i=>offsets[i]));
+    split=offsets[split];
+    // Smooth each shared boundary once. Major corners and graph junctions stay pinned.
+    const count=sampled.length-1,radius=Math.ceil(3*smoothing);
+    const pins=new Set(corners);
+    if(!closed) {pins.add(0);pins.add(count);}
+    const weights=Array.from({length:radius*2+1},(_,i)=>Math.exp(-0.5*((i-radius)/smoothing)**2));
+    const weightSum=weights.reduce((a,b)=>a+b,0);
+    const before=unit(sub(sampled[1],sampled[0])),after=unit(sub(sampled[count],sampled[count-1]));
+    const at=(i:number):Point=>closed?sampled[(i%count+count)%count]:i<0?[sampled[0][0]+before[0]*i,sampled[0][1]+before[1]*i]:i>count?[sampled[count][0]+after[0]*(i-count),sampled[count][1]+after[1]*(i-count)]:sampled[i];
+    points=sampled.map((p,i)=>{
+      let nearest=radius;
+      for(let delta=-radius;delta<=radius;delta++) if(pins.has(closed?((i+delta)%count+count)%count:i+delta)) nearest=Math.min(nearest,Math.abs(delta));
+      const t=nearest/radius,blend=t*t*(3-2*t);
+      if(!blend) return p;
+      let x=0,y=0;
+      for(let delta=-radius;delta<=radius;delta++) {const q=at(i+delta),weight=weights[delta+radius];x+=q[0]*weight;y+=q[1]*weight;}
+      return round(mix(p,[x/weightSum,y/weightSum],blend));
+    });
+    if(closed) points[count]=points[0];
+  }
+  const anchors=[...new Set([0,...corners,...(closed?[split]:[]),points.length-1])].sort((a,b)=>a-b);
+  // Estimate tangents across several pixel steps, rather than a single horizontal/vertical edge.
+  const tangent=(index:number): Point=>{
+    let before=index,after=index,back=0,forward=0;
+    const n=points.length-1;
+    while(back<4) {
+      const next=before>0?before-1:closed?n-1:before;
+      if(next===before) break; back+=length(points[before],points[next]);before=next;
+    }
+    while(forward<4) {
+      const next=after<n?after+1:closed?1:after;
+      if(next===after) break;forward+=length(points[after],points[next]);after=next;
+    }
+    return unit(sub(points[after],points[before]));
+  };
+  const segments:PathSegment[]=[];
+  let budget=2_000_000;
+  for(let ai=1;ai<anchors.length;ai++) {
+    const first=anchors[ai-1],last=anchors[ai];
+    // Uniform arc-length samples prevent long collinear raster runs being underweighted.
+    const samples:Point[]=[points[first]];
+    for(let i=first+1;i<=last;i++) {
+      const count=Math.max(1,Math.ceil(length(points[i-1],points[i])));
+      for(let j=1;j<=count;j++) samples.push(mix(points[i-1],points[i],j/count));
+    }
+    const localTangent=(index:number)=>unit(sub(samples[Math.min(samples.length-1,index+4)],samples[Math.max(0,index-4)]));
+    const startTangent=corners.has(first)?localTangent(0):tangent(first);
+    const endTangent=(corners.has(last) || closed && last===points.length-1 && corners.has(0))?localTangent(samples.length-1):tangent(last);
+    const stack:{start:number;end:number;left:Point;right:Point;depth:number}[]=[{start:0,end:samples.length-1,left:startTangent,right:endTangent,depth:0}];
+    while(stack.length) {
+      const job=stack.pop()!, {start,end,left,right,depth}=job;
+      const data=samples.slice(start,end+1), a=data[0],b=data[data.length-1];
+      budget-=data.length*6;
+      if(budget<0) return exactContour(original);
+      if(depth>=20) return exactContour(original);
+      if(data.length===2) {segments.push({type:'L',to:b});continue;}
+      const chord=unit(sub(b,a));
+      if(chord[0]*left[0]+chord[1]*left[1]>0.999 && chord[0]*right[0]+chord[1]*right[1]>0.999 && data.every(p=>distanceToSegment(p,a,b)<=tolerance)) {
+        segments.push({type:'L',to:b});continue;
+      }
+      const parameters=[0];
+      for(let i=1;i<data.length;i++) parameters.push(parameters[i-1]+length(data[i-1],data[i]));
+      const arc=parameters[parameters.length-1];
+      let ts=parameters.map(t=>t/arc), worst=1, best:Cubic|undefined;
+      for(let iteration=0;iteration<5;iteration++) {
+        let aa=0,ab=0,bb=0,ax=0,bx=0;
+        for(let i=0;i<data.length;i++) {
+          const t=ts[i],u=1-t,k1=3*u*u*t,k2=3*u*t*t;
+          const v:Point=[left[0]*k1,left[1]*k1],w:Point=[-right[0]*k2,-right[1]*k2];
+          const residual:Point=[data[i][0]-(u**3+k1)*a[0]-(k2+t**3)*b[0],data[i][1]-(u**3+k1)*a[1]-(k2+t**3)*b[1]];
+          aa+=v[0]**2+v[1]**2;ab+=v[0]*w[0]+v[1]*w[1];bb+=w[0]**2+w[1]**2;
+          ax+=v[0]*residual[0]+v[1]*residual[1];bx+=w[0]*residual[0]+w[1]*residual[1];
+        }
+        const determinant=aa*bb-ab*ab;
+        let h1=(ax*bb-bx*ab)/determinant,h2=(bx*aa-ax*ab)/determinant;
+        if(!Number.isFinite(h1) || !Number.isFinite(h2) || h1<arc*1e-6 || h2<arc*1e-6 || h1>arc*2 || h2>arc*2) h1=h2=length(a,b)/3;
+        const c:Cubic=[a,round([a[0]+left[0]*h1,a[1]+left[1]*h1]),round([b[0]-right[0]*h2,b[1]-right[1]*h2]),b];
+        let error=0;
+        for(let i=1;i<data.length-1;i++) {const d=length(data[i],cubicAt(c,ts[i]));if(d>error){error=d;worst=i;}}
+        if(error<=tolerance) {best=c;break;}
+        // Newton projection, accepted only while the parameter ordering remains monotonic.
+        const projected=ts.map((t,i)=>{
+          if(i===0 || i===ts.length-1) return t;
+          const u=1-t,p=cubicAt(c,t);
+          const d:Point=xy(k=>3*u*u*(c[1][k]-c[0][k])+6*u*t*(c[2][k]-c[1][k])+3*t*t*(c[3][k]-c[2][k]));
+          const dd:Point=xy(k=>6*u*(c[2][k]-2*c[1][k]+c[0][k])+6*t*(c[3][k]-2*c[2][k]+c[1][k]));
+          const delta=sub(p,data[i]),denominator=d[0]**2+d[1]**2+delta[0]*dd[0]+delta[1]*dd[1];
+          return Math.max(0,Math.min(1,t-(delta[0]*d[0]+delta[1]*d[1])/(denominator||1)));
+        });
+        if(projected.some((t,i)=>i>0 && t<=projected[i-1])) break;
+        ts=projected;
+      }
+      if(best) segments.push({type:'C',control1:best[1],control2:best[2],to:b});
+      else {
+        const middle=start+worst, direction=localTangent(middle);
+        stack.push({start:middle,end,left:direction,right,depth:depth+1},{start,end:middle,left,right:direction,depth:depth+1});
+      }
+    }
+  }
+  return {start:points[0],segments};
+}
+
 export function contourArea(contour: VectorContour): number {
   let p = contour.start, area = 0;
   for (const segment of contour.segments) {
-    area += segment.type === 'Q'
+    if (segment.type === 'C') {
+      const a=segment.control1,b=segment.control2,q=segment.to;
+      const coefficients:Point[]=[p,[3*(a[0]-p[0]),3*(a[1]-p[1])],[3*(p[0]-2*a[0]+b[0]),3*(p[1]-2*a[1]+b[1])],[q[0]-p[0]+3*(a[0]-b[0]),q[1]-p[1]+3*(a[1]-b[1])]];
+      for(let i=0;i<4;i++) for(let j=1;j<4;j++) area+=cross(coefficients[i],coefficients[j])*j/(i+j)/2;
+    } else area += segment.type === 'Q'
       ? (cross(p,segment.control)+cross(segment.control,segment.to))/3 + cross(p,segment.to)/6
       : cross(p,segment.to)/2;
     p = segment.to;
@@ -89,15 +236,25 @@ export function contourArea(contour: VectorContour): number {
 }
 export function contourPath(contours: VectorContour[]): string {
   const point = (p: Point) => `${p[0]} ${p[1]}`;
-  return contours.map(c=>`M${point(c.start)}${c.segments.map(s=>s.type==='Q'?`Q${point(s.control)} ${point(s.to)}`:`L${point(s.to)}`).join('')}Z`).join('');
+  return contours.map(c=>`M${point(c.start)}${c.segments.map(s=>s.type==='C'?`C${point(s.control1)} ${point(s.control2)} ${point(s.to)}`:s.type==='Q'?`Q${point(s.control)} ${point(s.to)}`:`L${point(s.to)}`).join('')}Z`).join('');
 }
-/** Flatten only for collision checks; SVG retains the actual quadratic commands. */
+/** Flatten only for collision checks; SVG retains the actual quadratic/cubic commands. */
 function flatten(contour: VectorContour): Point[] {
   const result = [contour.start];
   let p = contour.start;
   for (const s of contour.segments) {
     if (s.type==='L') result.push(s.to);
-    else {
+    else if(s.type==='C') {
+      const stack:[Cubic,number][]=[[[p,s.control1,s.control2,s.to],0]];
+      while(stack.length) {
+        const [c,depth]=stack.pop()!;
+        if(depth>=12 || Math.max(distanceToSegment(c[1],c[0],c[3]),distanceToSegment(c[2],c[0],c[3]))<=0.015) result.push(c[3]);
+        else {
+          const ab=mix(c[0],c[1]),bc=mix(c[1],c[2]),cd=mix(c[2],c[3]),abc=mix(ab,bc),bcd=mix(bc,cd),center=mix(abc,bcd);
+          stack.push([[center,bcd,cd,c[3]],depth+1],[[c[0],ab,abc,center],depth+1]);
+        }
+      }
+    } else {
       const stack: [Point,Point,Point,number][] = [[p,s.control,s.to,0]];
       while (stack.length) {
         const [a,b,c,depth] = stack.pop()!;
@@ -111,7 +268,7 @@ function flatten(contour: VectorContour): Point[] {
 }
 function reversed(contour: VectorContour): VectorContour {
   const points = [contour.start,...contour.segments.map(s=>s.to)];
-  return { start:points[points.length-1], segments:contour.segments.map((s,i): PathSegment=>s.type==='Q'?{type:'Q',control:s.control,to:points[i]}:{type:'L',to:points[i]}).reverse() };
+  return { start:points[points.length-1], segments:contour.segments.map((s,i): PathSegment=>s.type==='C'?{type:'C',control1:s.control2,control2:s.control1,to:points[i]}:s.type==='Q'?{type:'Q',control:s.control,to:points[i]}:{type:'L',to:points[i]}).reverse() };
 }
 function linesOf(chains: Chain[], original = false): Line[] {
   const lines: Line[] = [];
@@ -179,13 +336,13 @@ function conflicts(chains: Chain[]): Set<number> {
 }
 
 /** Fit every undirected boundary once, then reuse it in opposite directions for its materials. */
-export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tolerance: number, pixelSizeMm: number) {
+export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tolerance: number, pixelSizeMm: number, quality: 'balanced' | 'high' = 'balanced', smoothing = 1) {
   const stats = { pathSegments:0, curveSegments:0, simplifiedBoundaries:0, fallbackBoundaries:0 };
   const finish = () => {
     for (const layer of layers) {
       layer.path=contourPath(layer.contours);
       layer.vectorAreaMm2=layer.contours.reduce((sum,c)=>sum+contourArea(c),0)*pixelSizeMm**2;
-      for(const c of layer.contours) for(const s of c.segments) { stats.pathSegments++; if(s.type==='Q') stats.curveSegments++; }
+      for(const c of layer.contours) for(const s of c.segments) { stats.pathSegments++; if(s.type!=='L') stats.curveSegments++; }
     }
     return stats;
   };
@@ -218,9 +375,10 @@ export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tol
     }
     const closed=current===start, exact=exactContour(points);
     // A cycle based at a junction must keep that junction fixed, just like an open chain.
-    const fitted=fit(points,closed && nodes.get(start)!.edges.length===2,tolerance);
+    const freeLoop=closed && nodes.get(start)!.edges.length===2;
+    const fitted=quality==='high'?fitHigh(points,freeLoop,tolerance,smoothing):fit(points,freeLoop,tolerance);
     const active=JSON.stringify(exact)!==JSON.stringify(fitted);
-    chains.push({points,closed,exact,fitted,active});
+    chains.push({points,closed,exact,fitted,active,attempts:0});
   }
   for(const [id,node] of nodes) if(node.edges.length!==2) for(const edge of node.edges) if(!visited[edge]) walk(id,edge);
   for(let id=0;id<edges.length;id++) if(!visited[id]) walk(Math.min(edges[id].a,edges[id].b),id);
@@ -245,15 +403,28 @@ export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tol
     if(!same(segments[segments.length-1].to,start!)) throw new Error('Vector contour is not closed.');
     return {start:start!,segments};
   }
-  for(let pass=0;pass<5;pass++) {
+  const retries=quality==='high'?(smoothing?[{tolerance,smoothing:smoothing/2},{tolerance,smoothing:0},{tolerance:tolerance/2,smoothing:0}]:[{tolerance:tolerance/2,smoothing:0}]):[];
+  const passes=quality==='high'?8:5;
+  for(let pass=0;pass<passes;pass++) {
     const bad=conflicts(chains);
     references.forEach((layer,li)=>layer.forEach((refs,ri)=>{
       const old=signedArea(layers[li].rings[ri]), area=contourArea(assemble(refs));
       if (area*old<=0 || Math.abs(area)<Math.abs(old)*0.5 || Math.abs(area)>Math.abs(old)*1.5) for(const ref of refs) if(chains[ref.chain].active) bad.add(ref.chain);
     }));
     if(!bad.size) break;
-    if(pass===4) chains.forEach((chain,i)=>{if(chain.active) bad.add(i);});
-    for(const id of bad) if(chains[id].active) {chains[id].active=false;stats.fallbackBoundaries++;}
+    if(pass===passes-1) chains.forEach((chain,i)=>{if(chain.active) bad.add(i);});
+    for(const id of bad) {
+      const chain=chains[id];
+      if(!chain.active) continue;
+      const retry=retries[chain.attempts++];
+      if(pass<passes-1 && retry) {
+        const freeLoop=chain.closed && nodes.get(key(chain.points[0]))!.edges.length===2;
+        chain.fitted=fitHigh(chain.points,freeLoop,retry.tolerance,retry.smoothing);
+        chain.active=JSON.stringify(chain.exact)!==JSON.stringify(chain.fitted);
+        if(chain.active) continue;
+      }
+      chain.active=false;stats.fallbackBoundaries++;
+    }
   }
   stats.simplifiedBoundaries=chains.filter(c=>c.active).length;
   layers.forEach((layer,i)=>{layer.contours=references[i].map(assemble);});

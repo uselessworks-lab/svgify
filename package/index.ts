@@ -14,7 +14,7 @@ import { serializeSvg } from './svg.js';
 export function convertImage(input: RasterImage, options: ConvertOptions = {}, quantizer: Quantizer = oklabQuantizer): ConversionResult {
   validateImage(input);
   const o = resolveOptions(options), resized = resizeImage(input, o.maxDimension);
-  const background = o.removeBackground ? removeBorderBackground(resized, o.alphaThreshold) : { image: resized, removedPixels: 0 };
+  const background = o.removeBackground ? removeBorderBackground(resized, o.alphaThreshold, o.backgroundTolerance) : { image: resized, removedPixels: 0 };
   const image = background.image;
   const quantized = { ...quantizer.quantize(image, o) };
   if (quantized.width !== image.width || quantized.height !== image.height || !(quantized.labels instanceof Int8Array) || quantized.labels.length !== image.width*image.height || quantized.palette.length > o.colors || !Number.isFinite(quantized.quantizationError) || quantized.quantizationError < 0) throw new Error('Quantizer returned an invalid indexed image.');
@@ -46,7 +46,7 @@ export function convertImage(input: RasterImage, options: ConvertOptions = {}, q
     }
     pointContacts += contacts.size;
   }
-  const vectorStats = vectorizeLayers(layers, quantized, o.curveTolerance, pixelSizeMm);
+  const vectorStats = vectorizeLayers(layers, quantized, o.curveTolerance, pixelSizeMm, o.curveQuality, o.curveSmoothing);
   const warnings: string[] = [];
   if (o.removeBackground && !background.removedPixels) warnings.push('No dominant solid background was detected at the image border; the image was kept unchanged.');
   if (vectorStats.fallbackBoundaries) warnings.push(`${vectorStats.fallbackBoundaries} boundaries retained pixel detail to protect small features or avoid contour collisions.`);

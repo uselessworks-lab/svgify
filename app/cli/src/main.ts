@@ -11,6 +11,9 @@ Usage: svgify <input.png> [--output output.svg] [options]
 
   --colors 8              Maximum colors (1–16)
   --palette '#112233,#ffffff'  Available filament colors (#rrggbb)
+  --curve-smoothing 1    Edge denoising scale (0–3px), high quality only
+  --curve-quality balanced  balanced or high (smooth cubic fitting)
+  --background-tolerance 0.015  Original-color Oklab distance (0–0.1)
   --curve-tolerance 1    Simplify boundaries in pixels; 0 keeps pixel edges
   --width-mm 100          Physical output width
   --max-dimension 768     Longest processing edge (16–2048)
@@ -33,7 +36,7 @@ Output is planar vector artwork for extrusion, not a sliced 3D model.
 async function main() {
   const { values: v, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     output: { type: 'string', short: 'o' }, colors: { type: 'string' }, palette: { type: 'string' },
-    'curve-tolerance': { type: 'string' }, 'width-mm': { type: 'string' }, 'max-dimension': { type: 'string' }, 'min-region-pixels': { type: 'string' },
+    'curve-smoothing': { type: 'string' }, 'curve-quality': { type: 'string' }, 'background-tolerance': { type: 'string' }, 'curve-tolerance': { type: 'string' }, 'width-mm': { type: 'string' }, 'max-dimension': { type: 'string' }, 'min-region-pixels': { type: 'string' },
     'min-region-mm2': { type: 'string' }, iterations: { type: 'string' }, 'alpha-threshold': { type: 'string' },
     'remove-background': { type: 'boolean' }, matte: { type: 'string' }, layers: { type: 'string' }, report: { type: 'string' }, force: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
   } });
@@ -44,11 +47,12 @@ async function main() {
   if (output !== '-' && resolve(output) === input) throw new Error('Input and output must be different files.');
   if (v.report && (resolve(v.report) === input || (output !== '-' && resolve(v.report) === resolve(output)))) throw new Error('Report must have a separate output path.');
   const options: ConvertOptions = {};
-  const numeric = { colors: 'colors', 'curve-tolerance': 'curveTolerance', 'width-mm': 'widthMm', 'max-dimension': 'maxDimension', 'min-region-pixels': 'minRegionPixels', 'min-region-mm2': 'minRegionAreaMm2', iterations: 'iterations', 'alpha-threshold': 'alphaThreshold' } as const;
+  const numeric = { colors: 'colors', 'curve-smoothing': 'curveSmoothing', 'background-tolerance': 'backgroundTolerance', 'curve-tolerance': 'curveTolerance', 'width-mm': 'widthMm', 'max-dimension': 'maxDimension', 'min-region-pixels': 'minRegionPixels', 'min-region-mm2': 'minRegionAreaMm2', iterations: 'iterations', 'alpha-threshold': 'alphaThreshold' } as const;
   for (const [flag, name] of Object.entries(numeric)) {
     const raw = v[flag as keyof typeof numeric];
     if (raw !== undefined) { if (!raw.trim()) throw new Error(`${flag} requires a number.`); options[name] = Number(raw); }
   }
+  if (v['curve-quality'] !== undefined) options.curveQuality = v['curve-quality'] as ConvertOptions['curveQuality'];
   if (v.palette !== undefined) options.palette = v.palette.split(',').map(c=>c.trim());
   if (v.matte !== undefined) options.matte = v.matte;
   if (v['remove-background'] !== undefined) options.removeBackground = v['remove-background'];

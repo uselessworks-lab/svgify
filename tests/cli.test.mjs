@@ -36,6 +36,10 @@ test('CLI PNG decode, core parity, reports, layer exports, stdout and safe overw
     const removed=run([backgroundFile,'--remove-background','--min-region-pixels','0','-o','-']);
     assert.equal(removed.status,0,removed.stderr);
     assert.equal(removed.stdout.trim(),convertImage({data:backgroundData,width:8,height:8},{removeBackground:true,minRegionPixels:0}).svg);
+    assert.equal(run([file,'--curve-quality','high','--background-tolerance','0.01','--curve-smoothing','2','-o','-']).stdout.trim(),convertImage({data,width:2,height:2},{curveQuality:'high',backgroundTolerance:0.01,curveSmoothing:2}).svg);
+    assert.equal(run([file,'--curve-smoothing','4','-o','-']).status,1);
+    assert.equal(run([file,'--curve-quality','bad','-o','-']).status,1);
+    assert.equal(run([file,'--background-tolerance','0.2','-o','-']).status,1);
     assert.equal(run(['--help']).status,0);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });

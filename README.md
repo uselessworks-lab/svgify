@@ -20,7 +20,7 @@ The core is a dependency-free TypeScript library that runs in browsers and Node.
 - Conservative small-region cleanup without crossing transparency
 - Closed SVG paths with preserved hole winding
 - Shared boundaries between adjacent colors
-- Line and quadratic Bézier fitting for smoother zoomed output
+- Line, quadratic and optional high-quality cubic Bézier fitting for smoother zoomed output
 - Physical width in millimeters and aligned per-color layers
 - Browser, Web Worker, Node.js, and CLI support
 
@@ -60,6 +60,7 @@ const result = convertImage(
     widthMm: 100,
     maxDimension: 768,
     curveTolerance: 1,
+    curveQuality: 'high', // optional: slower, smoother shared-boundary fitting
     minRegionPixels: 8,
     minRegionAreaMm2: 0.1,
     removeBackground: false,
@@ -116,12 +117,15 @@ const result = convertImage({ width: info.width, height: info.height, data });
 |---|---:|---|
 | `colors` | `8` | Maximum output colors, from 1 to 16 |
 | `palette` | auto | Optional `#rrggbb[]` filament palette |
-| `curveTolerance` | `1` | Boundary simplification in pixels, from 0 to 4; `0` keeps pixel edges |
+| `curveQuality` | `balanced` | `high` fits cubic Béziers to shared raster boundaries; slower, smoother zoomed curves |
+| `curveSmoothing` | `1` | Boundary denoising scale, 0–3 processing px; high quality only, 0 disables |
+| `backgroundTolerance` | `0.015` | Original-color Oklab distance for background removal, from 0 to 0.1; lower protects pale artwork |
+| `curveTolerance` | `1` | Simplification/fitting tolerance in pixels, from 0 to 4; `0` keeps pixel edges |
 | `maxDimension` | `768` | Longest processing edge, from 16 to 2048; images are never upscaled |
 | `minRegionPixels` | `8` | Merge connected regions smaller than this pixel area |
 | `minRegionAreaMm2` | `0` | Additional physical area threshold |
 | `widthMm` | `100` | Physical output width; height follows the processed aspect ratio |
-| `removeBackground` | `false` | Remove a dominant solid color connected to the image border |
+| `removeBackground` | `false` | Remove a dominant solid color connected to the image border, before quantization |
 | `alphaThreshold` | `128` | Pixels below this alpha become empty space |
 | `matte` | `#ffffff` | Matte for retained translucent pixels |
 
@@ -152,7 +156,7 @@ npm ci
 npm run dev
 ```
 
-For local development, open [http://127.0.0.1:4020](http://127.0.0.1:4020). The English-only demo processes images locally in the browser and exposes Original, SVG, and Split views with synchronized zoom and pan. Conversion options update the preview automatically after a short debounce.
+For local development, open [http://127.0.0.1:4020](http://127.0.0.1:4020). The English-only demo processes images locally in the browser and exposes Original, SVG, and Split views with synchronized zoom and pan. Conversion options update the preview automatically after a short debounce. Advanced options expose high-quality cubic curve fitting, boundary smoothing and original-color background tolerance. Try high quality with smoothing 1–2px to soften edge noise; stronger smoothing can soften fine detail.
 
 ## Repository layout
 
@@ -172,7 +176,7 @@ Algorithms, defaults, geometry, physical sizing, and SVG serialization live in `
 
 ```sh
 npm ci
-npm run verify   # typecheck, 24 tests, core/CLI/demo production builds
+npm run verify   # typecheck, tests, core/CLI/demo production builds
 npm run bench
 ```
 

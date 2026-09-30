@@ -14,10 +14,10 @@ function fixture(size,kind) {
   return {data,width:size,height:size};
 }
 console.log(JSON.stringify({node:process.version,cpu:cpus()[0]?.model,platform:process.platform,arch:process.arch,note:'Synthetic fixtures; median of 5 warm runs, conversion only; not a photo-quality benchmark.'}));
-for(const size of [256,512,768,1024]) for(const kind of ['flat','gradient-noise']) {
-  const image=fixture(size,kind),options={colors:16,maxDimension:size,minRegionPixels:8};
+for(const size of [256,512,768,1024]) for(const kind of ['flat','gradient-noise']) for(const curveQuality of ['balanced','high']) {
+  const image=fixture(size,kind),options={curveQuality,colors:16,maxDimension:size,minRegionPixels:8};
   convertImage(image,options); const times=[];let result;
   for(let i=0;i<5;i++){const start=performance.now();result=convertImage(image,options);times.push(performance.now()-start);}
   times.sort((a,b)=>a-b);
-  console.log(JSON.stringify({size,kind,medianMs:+times[2].toFixed(1),minMs:+times[0].toFixed(1),maxMs:+times[4].toFixed(1),colors:result.stats.colors,regions:result.stats.regions,vertices:result.stats.vertices,pathSegments:result.stats.pathSegments,curveSegments:result.stats.curveSegments,fallbackBoundaries:result.stats.fallbackBoundaries,svgKB:+(Buffer.byteLength(result.svg)/1024).toFixed(1),oklabRmse:result.stats.quantizationError}));
+  console.log(JSON.stringify({size,kind,curveQuality,medianMs:+times[2].toFixed(1),minMs:+times[0].toFixed(1),maxMs:+times[4].toFixed(1),colors:result.stats.colors,regions:result.stats.regions,vertices:result.stats.vertices,pathSegments:result.stats.pathSegments,curveSegments:result.stats.curveSegments,fallbackBoundaries:result.stats.fallbackBoundaries,svgKB:+(Buffer.byteLength(result.svg)/1024).toFixed(1),oklabRmse:result.stats.quantizationError}));
 }

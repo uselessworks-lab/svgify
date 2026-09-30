@@ -11,7 +11,13 @@ export interface ConvertOptions {
   colors?: number;
   /** Remove a dominant solid background connected to the border. Default false. */
   removeBackground?: boolean;
-  /** Boundary simplification in processing pixels, 0–4. Default 1; 0 preserves pixel edges. */
+  /** Original-color Oklab distance for border background matching, 0–0.1. Default 0.015. */
+  backgroundTolerance?: number;
+  /** Fast polygon rounding or iterative cubic fitting on shared boundaries. Default balanced. */
+  curveQuality?: 'balanced' | 'high';
+  /** Gaussian boundary denoising scale in processing pixels, 0–3. Default 1; high quality only. 0 disables. */
+  curveSmoothing?: number;
+  /** Simplification (balanced) or sampled curve fitting tolerance (high), in processing pixels, 0–4. Default 1; 0 preserves pixel edges. */
   curveTolerance?: number;
   /** Optional available filament colors; overrides learned palette, still bounded by colors. */
   palette?: readonly string[];
@@ -31,8 +37,8 @@ export interface ConvertOptions {
   matte?: string;
 }
 export interface ResolvedOptions {
-  removeBackground: boolean;
-  colors: number; curveTolerance: number; palette?: readonly string[]; maxDimension: number; iterations: number;
+  removeBackground: boolean; backgroundTolerance: number; curveQuality: 'balanced' | 'high';
+  colors: number; curveTolerance: number; curveSmoothing: number; palette?: readonly string[]; maxDimension: number; iterations: number;
   minRegionPixels: number; minRegionAreaMm2: number; widthMm: number;
   alphaThreshold: number; matte: string;
 }
@@ -44,13 +50,13 @@ export interface QuantizedImage {
   /** Weighted histogram approximation, before region cleanup; Oklab units × 100. */
   quantizationError: number;
 }
-export type PathSegment = { type: 'L'; to: Point } | { type: 'Q'; control: Point; to: Point };
+export type PathSegment = { type: 'L'; to: Point } | { type: 'Q'; control: Point; to: Point } | { type: 'C'; control1: Point; control2: Point; to: Point };
 export interface VectorContour { start: Point; segments: PathSegment[] }
 export interface ColorLayer {
   id: string; color: string; pixels: number; areaMm2: number;
   /** Exact pixel contours before curve fitting. Positive outer / negative hole winding in downward Y. */
   rings: Point[][];
-  /** Actual SVG geometry. Closed paths with line and quadratic Bézier segments. */
+  /** Actual SVG geometry. Closed paths with line, quadratic and cubic Bézier segments. */
   contours: VectorContour[];
   /** Signed vector area after fitting; areaMm2 remains the raster area for compatibility. */
   vectorAreaMm2: number;
