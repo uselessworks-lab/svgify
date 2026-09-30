@@ -335,6 +335,47 @@ function conflicts(chains: Chain[]): Set<number> {
   return bad;
 }
 
+/** A contour can cross itself where separately fitted chains meet, even when
+ * each shared chain is individually simple. Check the assembled outline. */
+export function contourCrossesItself(contour: VectorContour): boolean {
+  // Downstream SVG fill parsers commonly use 16 uniform subdivisions per
+  // curve. Their polygon can cross near a contour seam even when adaptive
+  // flattening misses that narrow overshoot.
+  const points:Point[]=[contour.start];
+  let from=contour.start;
+  for(const segment of contour.segments) {
+    if(segment.type==='L') points.push(segment.to);
+    else for(let step=1;step<=16;step++) {
+      const t=step/16,u=1-t;
+      points.push(segment.type==='C'
+        ? cubicAt([from,segment.control1,segment.control2,segment.to],t)
+        : [u*u*from[0]+2*u*t*segment.control[0]+t*t*segment.to[0],
+          u*u*from[1]+2*u*t*segment.control[1]+t*t*segment.to[1]]);
+    }
+    from=segment.to;
+  }
+  const lines:Line[]=[];
+  for(let i=1;i<points.length;i++) if(!same(points[i-1],points[i]))
+    lines.push({a:points[i-1],b:points[i],chain:0,index:lines.length,count:0});
+  if(lines.length<3) return false;
+  for(const line of lines) line.count=lines.length;
+  const grid=new Map<string,Line[]>();
+  for(const line of lines) {
+    const seen=new Set<Line>();
+    for(let y=Math.floor(Math.min(line.a[1],line.b[1])/8);y<=Math.floor(Math.max(line.a[1],line.b[1])/8);y++)
+      for(let x=Math.floor(Math.min(line.a[0],line.b[0])/8);x<=Math.floor(Math.max(line.a[0],line.b[0])/8);x++) {
+        const key=`${x},${y}`, bucket=grid.get(key) ?? [];
+        for(const other of bucket) if(!seen.has(other)) {
+          seen.add(other);
+          if(line.index-other.index>1 && !(line.index===lines.length-1 && other.index===0)
+            && collides(line,other,false)) return true;
+        }
+        bucket.push(line);grid.set(key,bucket);
+      }
+  }
+  return false;
+}
+
 /** Fit every undirected boundary once, then reuse it in opposite directions for its materials. */
 export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tolerance: number, pixelSizeMm: number, quality: 'balanced' | 'high' = 'balanced', smoothing = 1) {
   const stats = { pathSegments:0, curveSegments:0, simplifiedBoundaries:0, fallbackBoundaries:0 };
@@ -408,8 +449,10 @@ export function vectorizeLayers(layers: ColorLayer[], image: QuantizedImage, tol
   for(let pass=0;pass<passes;pass++) {
     const bad=conflicts(chains);
     references.forEach((layer,li)=>layer.forEach((refs,ri)=>{
-      const old=signedArea(layers[li].rings[ri]), area=contourArea(assemble(refs));
-      if (area*old<=0 || Math.abs(area)<Math.abs(old)*0.5 || Math.abs(area)>Math.abs(old)*1.5) for(const ref of refs) if(chains[ref.chain].active) bad.add(ref.chain);
+      const contour=assemble(refs), old=signedArea(layers[li].rings[ri]), area=contourArea(contour);
+      if (area*old<=0 || Math.abs(area)<Math.abs(old)*0.5 || Math.abs(area)>Math.abs(old)*1.5
+        || quality==='high' && contourCrossesItself(contour))
+        for(const ref of refs) if(chains[ref.chain].active) bad.add(ref.chain);
     }));
     if(!bad.size) break;
     if(pass===passes-1) chains.forEach((chain,i)=>{if(chain.active) bad.add(i);});

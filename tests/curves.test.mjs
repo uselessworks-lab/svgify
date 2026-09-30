@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { convertImage, exportLayer, resolveOptions } from '@uselessworks/svgify';
+import { contourCrossesItself } from '../dist/curves.js';
 function image(width,height,at) {
   const colors=[[24,63,59,255],[241,223,184,255],[220,114,72,255],[0,0,0,0]];
   const data=new Uint8Array(width*height*4);
@@ -45,6 +46,26 @@ function assertSharedCurves(result) {
   // All fixtures calling this are opaque with a straight rectangular outer boundary.
   for(const values of directions.values())assert.deepEqual(values.sort(),[-1,1],'internal curves must be identical and reversed for adjacent materials');
 }
+test('assembled high curves reject narrow crossings at the raster parser sampling interval',()=>{
+  // These two tiny fitted outlines crossed when sampled with the 16 divisions
+  // used by the downstream SVG fill parser, despite passing adaptive checks.
+  const unsafe=[
+    {start:[482,91],segments:[
+      {type:'C',control1:[482.841,90.573],control2:[483.333,89.667],to:[484,89]},
+      {type:'L',to:[484,91]},
+      {type:'C',control1:[483.658,91],control2:[482.158,90.842],to:[482,91]},
+    ]},
+    {start:[611,202],segments:[
+      {type:'C',control1:[611.158,201.842],control2:[611,200.342],to:[611,200]},
+      {type:'L',to:[613,200]},
+      {type:'C',control1:[612.333,200.667],control2:[611.427,201.159],to:[611,202]},
+    ]},
+  ];
+  for(const contour of unsafe)assert.equal(contourCrossesItself(contour),true);
+  assert.equal(contourCrossesItself({start:[0,0],segments:[
+    {type:'L',to:[2,0]},{type:'L',to:[2,2]},{type:'L',to:[0,2]},{type:'L',to:[0,0]},
+  ]}),false);
+});
 test('circle becomes compact Bézier geometry with identical shared material borders',async()=>{
   const input=image(160,160,(x,y)=>Math.hypot(x-80,y-80)<55?0:1);
   const exact=convertImage(input,{colors:2,minRegionPixels:0,curveTolerance:0});
