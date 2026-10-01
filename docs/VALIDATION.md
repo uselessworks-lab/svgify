@@ -144,3 +144,9 @@ Flat inputs retain all 16 source colors exactly. A separate 16-color grayscale r
 
 - Every conversion control now schedules a preview update after a 180ms debounce. New input terminates obsolete Worker work and increments the request token, so an older response cannot replace the latest settings.
 - Native form validation pauses automatic conversion for incomplete numeric values. The previous preview can remain visible while editing, but its download is disabled until a current conversion succeeds. The Convert button remains available for an immediate manual retry.
+
+## SVG color-only utilities and main integration — 2026-10-01
+
+- Added `quantizeColors` and `quantizeSvgColors`, including the lightweight `./colors` export. SVG tests cover preserved geometry/source bytes, alpha/references, palette bounds, shared raster palette learning, weights and explicit unsupported syntax.
+- The dependency boundary test now inspects TypeScript identifiers instead of matching host-global words in comments; the SVG source-copying comment had caused a false positive. Forbidden imports and host identifiers remain checked.
+- `npm run verify` passed: workspace typechecks, all 34 tests, and core/CLI/demo production builds. This full gate was run because integration into `main` triggers the demo deployment workflow. Actual slicer/CAD imports and physical prints remain outside this validation.
