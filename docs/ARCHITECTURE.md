@@ -12,7 +12,8 @@ Reference: the local useless works handbook, `docs/technical/project-architectur
 | Conversion composition, validation, diagnostics | `package/index.ts` |
 | Optional border-connected background removal | `package/background.ts` |
 | Alpha-aware area resampling | `package/raster.ts` |
-| Oklab transform and quantization | `color.ts`, `quantize.ts` |
+| Oklab transform and shared raster/vector palette learning | `color.ts`, `quantize.ts` |
+| Color-only public API and SVG paint-only source edits | `colors.ts`, `svg-colors.ts` |
 | Connected-component cleanup | `regions.ts` |
 | Raster geometry, orientation, closure, simple rings | `trace.ts` |
 | Shared boundary graph, line/curve fitting, collision fallback | `curves.ts` |
@@ -77,3 +78,7 @@ The root library package includes ESM, declarations, README and license. CLI has
 The production web build uses relative asset URLs so the same `app/web/dist` artifact works under the repository-scoped `/svgify/` GitHub Pages path. Pull requests run the complete verification build without deployment. A successful `main` push uploads the already-verified web artifact and deploys it through the `github-pages` environment.
 
 The repository root exposes core ESM and declarations from `dist/` through `main`, `types`, and `exports`. Its `prepare` script builds only the core, allowing `git+https://github.com/uselessworks-lab/svgify.git` to be installed directly without bundling the CLI or demo. The root remains private to prevent accidental npm publication. The root package name matches the public import name so direct Git installs produce `@uselessworks/svgify` without an alias.
+
+## Vector paint palette
+
+The `./colors` public entry shares weighted Oklab palette learning with raster bins but uses explicit color swatches without image allocation. SVG string edits preserve all non-paint bytes; CSS color resolution is an optional neutral port, and unsupported stylesheet/cascade semantics are documented in the package README. Consumers with an existing parser use `quantizeColors` on their canonical paints and can supply area weights. Formify retains ownership of printable opacity, background removal, source interpretation and geometry.

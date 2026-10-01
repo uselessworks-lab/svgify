@@ -131,6 +131,10 @@ const result = convertImage({ width: info.width, height: info.height, data });
 
 See [the core package documentation](package/README.md) for the complete result contract, geometry semantics, custom quantizers, and limitations.
 
+## SVG color-only utilities
+
+`quantizeSvgColors(svg, { colors: 8 })` preserves vector geometry and remaps explicit paint colors. `quantizeColors(samples, options)` accepts resolved hex swatches and optional area weights. Both are available from `@uselessworks/svgify/colors` without image conversion imports; see [supported paint syntax and semantics](package/README.md#vector-color-remapping).
+
 ## CLI
 
 The CLI lives in a separate workspace and uses Sharp for decoding.

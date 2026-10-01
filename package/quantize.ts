@@ -1,7 +1,8 @@
 import type { QuantizedImage, Quantizer, RasterImage, ResolvedOptions, RGB } from './types.js';
 import { distance, fromLab, toLab } from './color.js';
 import type { Lab } from './color.js';
-import { parseHex } from './options.js';
+import { parseHex, resolveOptions, toHex } from './options.js';
+import type { ColorQuantizationOptions, ColorQuantizationResult, ColorSample } from './types.js';
 interface Bin { key: number; weight: number; lab: Lab; rgb: RGB }
 function nearest(lab: Lab, centers: Lab[]): number {
   let best = 0, error = Infinity;
@@ -48,6 +49,16 @@ function quantize(image: RasterImage, o: Readonly<ResolvedOptions>): QuantizedIm
     }
     return { width: image.width, height: image.height, labels, palette, quantizationError: 0 };
   }
+  const palette = learnPalette(bins, o);
+  const centers = palette.map(toLab), lookup = new Int8Array(32768);
+  let error = 0, total = 0;
+  for (const bin of bins) { const c = nearest(bin.lab, centers); lookup[bin.key] = c; error += distance(bin.lab, centers[c])*bin.weight; total += bin.weight; }
+  for (let p = 0; p < labels.length; p++) if (keys[p] >= 0) labels[p] = lookup[keys[p]];
+  return { width: image.width, height: image.height, labels, palette, quantizationError: Math.sqrt(error/total)*100 };
+}
+
+/** Shared weighted Oklab palette learning for raster bins and vector paint samples. */
+function learnPalette(bins: readonly Bin[], o: Readonly<ResolvedOptions>): RGB[] {
   let palette: RGB[];
   if (o.palette) palette = o.palette.map(parseHex);
   else {
@@ -81,9 +92,34 @@ function quantize(image: RasterImage, o: Readonly<ResolvedOptions>): QuantizedIm
   }
   // Remove duplicate gamut-clipped colors, sort for reproducible layer order.
   palette = [...new Map(palette.map(rgb => [rgb.join(','), rgb])).values()].sort((a,b) => toLab(a)[0]-toLab(b)[0]);
-  const centers = palette.map(toLab), lookup = new Int8Array(32768);
+  return palette;
+}
+
+/** Quantize explicit sRGB swatches without allocating pixels or changing geometry. */
+export function quantizeColors(samples: readonly ColorSample[], options: ColorQuantizationOptions = {}): ColorQuantizationResult {
+  const o = resolveOptions(options);
+  const colors = new Map<string, { rgb: RGB; weight: number }>();
+  for (const sample of samples) {
+    const rgb = parseHex(sample.color), color = toHex(rgb), weight = sample.weight ?? 1;
+    if (!Number.isFinite(weight) || weight <= 0) throw new RangeError('Color weights must be positive and finite.');
+    const previous = colors.get(color);
+    const sum = (previous?.weight ?? 0) + weight;
+    if (!Number.isFinite(sum)) throw new RangeError('Combined color weight is too large.');
+    colors.set(color, { rgb, weight: sum });
+  }
+  if (!colors.size) return { palette: [], mapping: [], quantizationError: 0 };
+  // Keep exact vector colors, including colors in the same raster histogram bin.
+  const bins: Bin[] = [...colors.values()].sort((a, b) =>
+    a.rgb[0] - b.rgb[0] || a.rgb[1] - b.rgb[1] || a.rgb[2] - b.rgb[2])
+    .map(({ rgb, weight }, key) => ({ key, rgb, weight, lab: toLab(rgb) }));
+  const palette = !o.palette && bins.length <= o.colors ? bins.map(bin => bin.rgb) : learnPalette(bins, o);
+  const centers = palette.map(toLab), used = new Set<string>();
   let error = 0, total = 0;
-  for (const bin of bins) { const c = nearest(bin.lab, centers); lookup[bin.key] = c; error += distance(bin.lab, centers[c])*bin.weight; total += bin.weight; }
-  for (let p = 0; p < labels.length; p++) if (keys[p] >= 0) labels[p] = lookup[keys[p]];
-  return { width: image.width, height: image.height, labels, palette, quantizationError: Math.sqrt(error/total)*100 };
+  const mapping = [...colors].map(([from, { rgb, weight }]) => {
+    const lab = toLab(rgb), index = nearest(lab, centers), to = toHex(palette[index]);
+    used.add(to); error += distance(lab, centers[index]) * weight; total += weight;
+    return { from, to };
+  });
+  return { palette: palette.map(toHex).filter(color => used.has(color)), mapping,
+    quantizationError: Math.sqrt(error / total) * 100 };
 }

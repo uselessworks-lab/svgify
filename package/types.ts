@@ -83,3 +83,17 @@ export interface ConversionResult {
 export interface Quantizer {
   quantize(image: RasterImage, options: Readonly<ResolvedOptions>): QuantizedImage;
 }
+
+/** Explicit vector paint swatch; weight is declaration frequency or caller-supplied area. */
+export interface ColorSample { readonly color: string; readonly weight?: number }
+export type ColorQuantizationOptions = Pick<ConvertOptions, 'colors' | 'palette' | 'iterations'>;
+export interface ColorQuantizationResult {
+  readonly palette: readonly string[];
+  readonly mapping: readonly { readonly from: string; readonly to: string }[];
+  readonly quantizationError: number;
+}
+export interface SvgColorQuantizationOptions extends ColorQuantizationOptions {
+  /** Resolve additional CSS color spellings, such as named colors or hsl(), to 8-bit sRGB. */
+  readonly resolveColor?: (color: string) => RGB | undefined;
+}
+export interface SvgColorQuantizationResult extends ColorQuantizationResult { readonly svg: string }

@@ -1,6 +1,7 @@
 export type * from './types.js';
 export { DEFAULT_OPTIONS, resolveOptions } from './options.js';
 export { oklabQuantizer } from './quantize.js';
+export { quantizeColors, quantizeSvgColors } from './colors.js';
 import type { ConversionResult, ConvertOptions, Quantizer, RasterImage } from './types.js';
 import { parseHex, resolveOptions, validateImage } from './options.js';
 import { removeBorderBackground } from './background.js';

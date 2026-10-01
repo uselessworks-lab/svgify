@@ -96,3 +96,40 @@ Exports: `convertImage`, `exportLayer`, `DEFAULT_OPTIONS`, `resolveOptions`, `ok
 This produces planar vector artwork, not STL/3MF/G-code or a printability guarantee. By default boundaries are simplified into lines and quadratic Bézier curves on a shared graph. `curveQuality: 'high'` fits cubic Béziers by least squares against arc-length sampled boundary points after optional Gaussian denoising (`curveSmoothing: 1` by default), refines parameters and splits curves until the sampled error fits the tolerance or bounded work limits retain pixel detail. Smooth splits share tangent directions; significant corners remain sharp. Smoothing suppresses small edge oscillations; 1–2px is a useful starting range. It is applied once per shared boundary with pinned major corners and graph junctions, without changing labels or raster rings. A closed loop can move its arbitrary seam. A wider neighborhood distinguishes major corners from small zigzags. Conflicting high-quality candidates retry with weaker/no denoising and tighter fitting before reverting to pixel edges. Very short chains, pinned junctions and final fallback boundaries can remain angular. Balanced mode ignores smoothing and exact mode disables all fitting. It usually takes more time and is independent of processing resolution and palette size. Cubic segments extend the public `PathSegment` union: consumers must handle `C` as well as `L`/`Q`. Significant corners and junctions stay fixed. `curveTolerance: 0` retains exact pixel polygons. Tolerance controls simplification/rounding in balanced mode and sampled fitting error after denoising in high mode; it is not a certified Hausdorff bound on the final curve. Fitting changes the raster silhouette and area slightly. Sampled intersection/orientation/area checks revert problematic boundaries; tiny or complex contours can remain angular. Above 250,000 source contour vertices the fitting stage is skipped with a warning. These checks are not a proof of CAD topology at arbitrary precision. Area cleanup does not enforce nozzle width, connectivity, thickness, or minimum gaps. Zero-width point contacts and detached islands can require repair or a base before extrusion. Actual slicer imports and physical prints have not been validated in v1. Output is capped at 2 million contour vertices; lower resolution or stronger cleanup helps complex images.
 
 Licensed under MIT. Oklab matrices are from [Björn Ottosson's public-domain reference](https://bottosson.github.io/posts/oklab/).
+
+## Vector color remapping
+
+```ts
+import { quantizeSvgColors, quantizeColors } from '@uselessworks/svgify/colors';
+
+const result = quantizeSvgColors(svgText, { colors: 8 });
+// result.svg: original SVG with only explicit paint colors remapped
+// result.palette, result.mapping ({ from, to }), result.quantizationError
+
+const palette = quantizeColors([
+  { color: '#ff0000', weight: 25 },
+  { color: '#00ff00', weight: 10 },
+], { colors: 1 });
+```
+
+The color-only entry imports no image conversion, raster tracing or curve fitting.
+Both APIs reuse the raster quantizer's deterministic weighted Oklab palette learning.
+`colors` (1–16, default 8), `palette` and `iterations` have the existing quantization
+semantics. Colors already within the limit remain exact when no fixed palette is
+supplied. `quantizeColors` takes `#rrggbb` swatches and optional positive weights;
+callers can supply planar areas instead of declaration frequency.
+
+`quantizeSvgColors` edits literal `fill`, `stroke`, `color`, `stop-color` and
+`flood-color` attributes and inline styles, weighted by declaration frequency.
+Path commands, coordinates, holes, transforms, dimensions, alpha/opacity, comments,
+other attributes and formatting stay intact. Hex (`#rgb`, `#rgba`, `#rrggbb`,
+`#rrggbbaa`) and `rgb()`/`rgba()` are built in. Named colors other than black and
+other CSS color syntax require a neutral `resolveColor(value): RGB | undefined`
+callback. Unresolved literal colors and `<style>` stylesheets raise an explicit
+error. This utility does not sanitize SVG or resolve the CSS cascade, implicit
+paints, inherited defaults, `currentColor`, `url()` or `var()` references; these
+references remain intact. Its palette bounds explicit solid declarations, not all
+colors produced by gradient interpolation, transparency or external styling.
+For a rendered/printable palette bound, parse those semantics in the consumer and
+use `quantizeColors` on the resolved colors, as Formify does after its opacity and
+background policy. No geometry is rasterized or retraced by either API.
